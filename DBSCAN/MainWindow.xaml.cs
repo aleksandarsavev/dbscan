@@ -27,18 +27,17 @@ namespace DBSCAN
         public MainWindow()
         {
             InitializeComponent();
-            Width = 800;
-            Height = 800;
-            NewRandomSession(100, MainGrid);
+            Width = 1100;
+            Height = 600;
+            NewRandomSession(350, 50, 3, MainGrid);
         }
 
-        private readonly Brush[] brushes = { Brushes.Orange, Brushes.Red, Brushes.Blue, Brushes.Yellow };
+        private readonly Brush[] brushes = { Brushes.Orange, Brushes.Red, Brushes.Blue, Brushes.Yellow, Brushes.Brown, Brushes.Violet };
 
-        private void NewRandomSession(int count, Panel container)
+        private void NewRandomSession(int count, double epsilon, uint minPoints, Panel container)
         {
             var points = GeneratePoints(count);
-            session = new DBSCANSession<Ellipse>(50, 3);
-            session.SimilarityFuncion = EuclideanDistance;
+            session = new DBSCANSession<Ellipse>(epsilon, minPoints) { SimilarityFuncion = EuclideanDistance };
             foreach (var ellipse in points)
             {
                 session.Points.Add(ellipse);
@@ -47,10 +46,12 @@ namespace DBSCAN
             int colorCounter = 0;
             foreach (var cluster in session.GetClusters())
             {
+                // ReSharper disable PossibleMultipleEnumeration
                 foreach (var ellipse in cluster)
                 {
-                    ellipse.Stroke = brushes[colorCounter % 4];
-                    ellipse.Fill = brushes[colorCounter % 4];
+                    ellipse.Stroke = ellipse.Fill = brushes[colorCounter % 6];
+                    ((PointInfo<Ellipse>)ellipse.Tag).Cluster = cluster;
+                    // ReSharper restore PossibleMultipleEnumeration
                     ellipse.ToolTip = "Cluster " + (colorCounter + 1);
                 }
                 colorCounter++;
@@ -63,51 +64,79 @@ namespace DBSCAN
             var result = new List<Ellipse>(count);
             for (int i = 0; i < count; i++)
             {
-                result.Add(CreateEllipse(r.Next(0, 800), r.Next(0, 800)));
+                result.Add(CreateEllipse(r.Next(0, 1100), r.Next(0, 600), 5.0));
             }
             return result;
         }
 
         public static double EuclideanDistance(Ellipse a, Ellipse b)
         {
-            var aa = (Point)a.Tag;
-            var bb = (Point)b.Tag;
+            var aa = ((PointInfo<Ellipse>)a.Tag).Coordinates;
+            var bb = ((PointInfo<Ellipse>)b.Tag).Coordinates;
             return aa.EuclideanDistance(bb);
         }
 
-        public Ellipse CreateEllipse(double x, double y)
+        public Ellipse CreateEllipse(double x, double y, double radius)
         {
             var e = new Ellipse
                     {
-                        Margin = new Thickness(x - 5, y - 5, 0, 0),
-                        Height = 10,
-                        Width = 10,
+                        Margin = new Thickness(x - radius, y - radius, 0, 0),
+                        Height = radius * 2,
+                        Width = radius * 2,
                         VerticalAlignment = VerticalAlignment.Top,
                         HorizontalAlignment = HorizontalAlignment.Left,
                         Stroke = Brushes.Black,
                         Fill = Brushes.Black,
                         Cursor = Cursors.Hand,
-                        Tag = new Point(x, y)
+                        Tag = new PointInfo<Ellipse>(new Point(x, y), null)
                     };
-            e.MouseEnter += (a, b) =>
-                            {
-                                tempo = new Ellipse
-                                              {
-                                                  Height = session.Epsilon * 2,
-                                                  Width = session.Epsilon * 2,
-                                                  Margin = new Thickness(x - session.Epsilon, y - session.Epsilon, 0, 0),
-                                                  VerticalAlignment = VerticalAlignment.Top,
-                                                  HorizontalAlignment = HorizontalAlignment.Left,
-                                                  Stroke = Brushes.Green,
-                                                  Fill = Brushes.Transparent,
-                                              };
-                                Panel.SetZIndex(tempo, -1000);
-                                ((Grid)(e.Parent)).Children.Add(tempo);
-                            };
-            e.MouseLeave += (a, b) => ((Grid)(e.Parent)).Children.Remove(tempo);
+            e.MouseEnter += (a, b) => DrawAllEpsilonCircles((Ellipse)a, session.Epsilon);
+            e.MouseLeave += (a, b) => RemoveAllEpsilonCircles();
             return e;
         }
 
-        private Ellipse tempo;
+        private Ellipse DrawEpsilonEllipse(Point center, double epsilon)
+        {
+            var ellipse = new Ellipse
+                          {
+                              VerticalAlignment = VerticalAlignment.Top,
+                              HorizontalAlignment = HorizontalAlignment.Left,
+                              Height = epsilon * 2,
+                              Width = epsilon * 2,
+                              Margin = new Thickness(center.X - epsilon, center.Y - epsilon, 0, 0),
+                              Stroke = Brushes.Green,
+                              Fill = Brushes.Transparent
+                          };
+            Panel.SetZIndex(ellipse, -1000);
+            return ellipse;
+        }
+
+        private IEnumerable<Ellipse> lastEllipses;
+
+        private void DrawAllEpsilonCircles(Ellipse ellipse, double epsilon)
+        {
+            DrawAllEpsilonCircles(((PointInfo<Ellipse>)ellipse.Tag).Cluster, epsilon);
+        }
+        private void DrawAllEpsilonCircles(IEnumerable<Ellipse> cluster, double epsilon)
+        {
+            if (cluster == null) return;//noise point
+            lastEllipses = cluster.Select(x => ((PointInfo<Ellipse>)x.Tag).Coordinates).Select(x => DrawEpsilonEllipse(x, epsilon)).ToArray();
+            foreach (var epsilonEllipse in lastEllipses)
+            {
+                MainGrid.Children.Add(epsilonEllipse);
+            }
+        }
+
+        private void RemoveAllEpsilonCircles()
+        {
+            if (lastEllipses != null)
+            {
+                foreach (var lastEllipse in lastEllipses)
+                {
+                    MainGrid.Children.Remove(lastEllipse);
+                }
+                lastEllipses = null;
+            }
+        }
     }
 }

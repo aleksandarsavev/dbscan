@@ -1,4 +1,3 @@
-﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -36,7 +35,7 @@ namespace DBSCAN.Base
         {
             get
             {
-                return coreCache ?? (coreCache = Points.Where(x => x.GetNeighbours(Points, Epsilon, SimilarityFuncion).Count() >= MinPoints).ToArray());
+                return coreCache ?? (coreCache = Points.Where(x => Utilities.GetNeighbours(x, Points, Epsilon, SimilarityFuncion).Count() >= MinPoints).ToArray());
             }
         }
 
@@ -83,46 +82,6 @@ namespace DBSCAN.Base
                     ExpandClusterAroundPointIntern(naighbour, cluster);
                 }
             }
-        }
-    }
-    //DBSCAN(D, eps, MinPts)
-    //   C = 0
-    //   for each unvisited point P in dataset D
-    //      mark P as visited
-    //      NeighborPts = regionQuery(P, eps)
-    //      if sizeof(NeighborPts) < MinPts
-    //         mark P as NOISE
-    //      else
-    //         C = next cluster
-    //         expandCluster(P, NeighborPts, C, eps, MinPts)
-
-    //expandCluster(P, NeighborPts, C, eps, MinPts)
-    //   add P to cluster C
-    //   for each point P' in NeighborPts 
-    //      if P' is not visited
-    //         mark P' as visited
-    //         NeighborPts' = regionQuery(P', eps)
-    //         if sizeof(NeighborPts') >= MinPts
-    //            NeighborPts = NeighborPts joined with NeighborPts'
-    //      if P' is not yet member of any cluster
-    //         add P' to cluster C
-
-    //regionQuery(P, eps)
-    //   return all points within P's eps-neighborhood (including P)
-
-    public delegate double Similarity<in T>(T a, T b);
-    public static class Utilities
-    {
-        public static IEnumerable<T> GetNeighbours<T>(this T point, IEnumerable<T> domain, double epsilon, Similarity<T> similarityFunction)
-        {
-            return domain.Where(x => similarityFunction(point, x) <= epsilon);
-        }
-
-        public static int counter = 0;
-        public static double EuclideanDistance(this Point a, Point b)
-        {
-            counter++;
-            return Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2));
         }
     }
 }
